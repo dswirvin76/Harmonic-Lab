@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onto-Geometry: Asymmetric Mass & Resonance</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #020202; color: #fff; font-family: 'Segoe UI', sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top:0; left:0; z-index: 1;}
+        
+        .panel {
+            position: absolute; z-index: 10;
+            background: rgba(10, 10, 15, 0.85); padding: 15px;
+            border-radius: 8px; border: 1px solid #333; width: 280px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+            max-height: 95vh; overflow-y: auto;
+        }
+        #controls-panel { top: 15px; left: 15px; }
+        #telemetry-panel { top: 15px; right: 15px; }
+
+        h2 { margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid #444; padding-bottom: 5px;}
+        .alpha-text { color: #00ffcc; }
+        .beta-text { color: #ff00ff; }
+        .global-text { color: #ffaa00; }
+
+        .control-group { margin-bottom: 12px; }
+        label { display: block; font-size: 11px; margin-bottom: 3px; color: #ddd; letter-spacing: 1px;}
+        input[type=range] { width: 100%; cursor: pointer; }
+        .slider-alpha { accent-color: #00ffcc; }
+        .slider-beta { accent-color: #ff00ff; }
+        .slider-global { accent-color: #ffaa00; }
+        
+        button {
+            width: 100%; padding: 10px; color: #000;
+            border: none; border-radius: 4px; font-weight: bold; cursor: pointer;
+            margin-top: 8px; transition: 0.2s; text-transform: uppercase; letter-spacing: 1px; font-size: 11px;
+        }
+        .btn-alpha { background: #00ffcc; } .btn-alpha:hover { background: #00ccaa; box-shadow: 0 0 10px rgba(0,255,204,0.5); }
+        .btn-beta { background: #ff00ff; } .btn-beta:hover { background: #cc00cc; box-shadow: 0 0 10px rgba(255,0,255,0.5); }
+        .btn-audio { background: #ffaa00; margin-bottom: 15px; } .btn-audio:hover { background: #e69900; }
+
+        .readout { font-family: 'Courier New', monospace; font-size: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; border-bottom: 1px solid #222; padding-bottom: 3px;}
+        .highlight span { font-size: 14px; font-weight: bold; }
+        .alpha-readout span { color: #00ffcc; text-shadow: 0 0 5px rgba(0,255,204,0.4); }
+        .beta-readout span { color: #ff00ff; text-shadow: 0 0 5px rgba(255,0,255,0.4); }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div class="panel" id="controls-panel">
+        <button class="btn-audio" id="audio-btn" onclick="initAudio()">1. Initialize Stereo Field</button>
+        
+        <h2 class="global-text">Bridge Dynamics</h2>
+        <div class="control-group">
+            <label id="lbl-couple">Coupling Strength: 0.05</label>
+            <input type="range" id="coupling" class="slider-global" min="0.00" max="0.2" step="0.01" value="0.05">
+        </div>
+
+        <h2 class="alpha-text">Entity Alpha (Left)</h2>
+        <div class="control-group">
+            <label id="lbl-size-A">Complexity (Size): 4</label>
+            <input type="range" id="size-A" class="slider-alpha" min="2" max="24" step="1" value="4">
+        </div>
+        <div class="control-group">
+            <label id="lbl-tension-A">Tension (k): 0.10</label>
+            <input type="range" id="tension-A" class="slider-alpha" min="0.001" max="0.4" step="0.01" value="0.10">
+        </div>
+        <div class="control-group">
+            <label id="lbl-damp-A">Entropy: 0.985</label>
+            <input type="range" id="damp-A" class="slider-alpha" min="0.80" max="0.999" step="0.001" value="0.985">
+        </div>
+        <button class="btn-alpha" onclick="triggerPulse('A')">Strike Alpha</button>
+
+        <h2 class="beta-text" style="margin-top:20px;">Entity Beta (Right)</h2>
+        <div class="control-group">
+            <label id="lbl-size-B">Complexity (Size): 4</label>
+            <input type="range" id="size-B" class="slider-beta" min="2" max="24" step="1" value="4">
+        </div>
+        <div class="control-group">
+            <label id="lbl-tension-B">Tension (k): 0.15</label>
+            <input type="range" id="tension-B" class="slider-beta" min="0.001" max="0.4" step="0.01" value="0.15">
+        </div>
+        <div class="control-group">
+            <label id="lbl-damp-B">Entropy: 0.985</label>
+            <input type="range" id="damp-B" class="slider-beta" min="0.80" max="0.999" step="0.001" value="0.985">
+        </div>
+        <button class="btn-beta" onclick="triggerPulse('B')">Strike Beta</button>
+    </div>
+
+    <div class="panel" id="telemetry-panel">
+        <h2 class="alpha-text">Alpha Telemetry</h2>
+        <div class="readout alpha-readout">Mass (Points): <span id="out-mass-A">0</span></div>
+        <div class="readout highlight alpha-readout">Active Freq: <span id="out-curr-A">0.0 Hz</span></div>
+        <div class="readout alpha-readout">Kinetic Energy: <span id="out-ke-A">0.00</span></div>
+        <div class="readout alpha-readout">Integrity: <span id="out-stress-A">100%</span></div>
+
+        <h2 class="beta-text" style="margin-top:20px;">Beta Telemetry</h2>
+        <div class="readout beta-readout">Mass (Points): <span id="out-mass-B">0</span></div>
+        <div class="readout highlight beta-readout">Active Freq: <span id="out-curr-B">0.0 Hz</span></div>
+        <div class="readout beta-readout">Kinetic Energy: <span id="out-ke-B">0.00</span></div>
+        <div class="readout beta-readout">Integrity: <span id="out-stress-B">100%</span></div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script>
+        // --- 1. SETUP THE SCENE ---
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x020202, 0.012);
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 25, 60);
+        camera.lookAt(0, 0, 0);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        const universeGroup = new THREE.Group();
+        scene.add(universeGroup);
+
+        // --- 2. MULTI-ENTITY ARCHITECTURE ---
+        const spacing = 3; 
+        let couplingStrength = 0.05;
+
+        class Entity {
+            constructor(name, size, color, tension, damping) {
+                this.name = name;
+                this.gridSize = size;
+                this.color = color;
+                this.k = tension;
+                this.damping = damping;
+                this.offset = new THREE.Vector3(0, 0, 0);
+                
+                this.particles = [];
+                this.springs = [];
+                
+                this.ke = 0;
+                this.stress = 0;
+                this.baseFreq = 0;
+                this.currentFreq = 0;
+
+                this.gainNode = null;
+                this.panner = null;
+                this.oscBase = null;
+                this.oscHarmonic = null;
+            }
+        }
+
+        let entA = new Entity('Alpha', 4, 0x00ffcc, 0.10, 0.985);
+        let entB = new Entity('Beta', 4, 0xff00ff, 0.15, 0.985);
+        let couplingSprings = [];
+
+        let geomA, linesA, geomB, linesB, geomCouple;
+
+        // --- 3. AUDIO ENGINE (STEREO) ---
+        let audioCtx, audioEnabled = false;
+
+        function initAudio() {
+            if (audioEnabled) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            function setupVoice(ent, panValue) {
+                ent.gainNode = audioCtx.createGain();
+                ent.gainNode.gain.value = 0.01;
+                
+                ent.panner = audioCtx.createStereoPanner();
+                ent.panner.pan.value = panValue;
+                
+                ent.oscBase = audioCtx.createOscillator();
+                ent.oscHarmonic = audioCtx.createOscillator();
+                ent.oscBase.type = 'sine';
+                ent.oscHarmonic.type = 'triangle';
+
+                ent.oscBase.connect(ent.gainNode);
+                ent.oscHarmonic.connect(ent.gainNode);
+                ent.gainNode.connect(ent.panner);
+                ent.panner.connect(audioCtx.destination);
+
+                ent.oscBase.start();
+                ent.oscHarmonic.start();
+            }
+
+            setupVoice(entA, -0.8); 
+            setupVoice(entB, 0.8);  
+
+            audioEnabled = true;
+            let btn = document.getElementById('audio-btn');
+            btn.innerText = "Stereo Field Active";
+            btn.style.background = "#00ffcc";
+        }
+
+        // --- 4. DYNAMIC MATRIX BUILDER ---
+        function clearUniverse() {
+            while(universeGroup.children.length > 0){ 
+                let child = universeGroup.children[0];
+                universeGroup.remove(child); 
+                if(child.geometry) child.geometry.dispose();
+                if(child.material) child.material.dispose();
+            }
+            entA.particles = []; entA.springs = [];
+            entB.particles = []; entB.springs = [];
+            couplingSprings = [];
+        }
+
+        function buildEntityGeometry(ent) {
+            const L = spacing; 
+            const center = (ent.gridSize * L) / 2;
+
+            for (let z = 0; z < ent.gridSize; z++) {
+                for (let y = 0; y < ent.gridSize; y++) {
+                    for (let x = 0; x < ent.gridSize; x++) {
+                        let px = (x + (y % 2) * 0.5 + (z % 2) * 0.5) * L - center + ent.offset.x;
+                        let py = (y * (Math.sqrt(3) / 2) + (z % 2) * (Math.sqrt(3) / 6)) * L - center;
+                        let pz = (z * Math.sqrt(2 / 3)) * L - center;
+
+                        ent.particles.push({
+                            pos: new THREE.Vector3(px, py, pz),
+                            vel: new THREE.Vector3(0, 0, 0),
+                            basePos: new THREE.Vector3(px, py, pz),
+                            mass: 1
+                        });
+                    }
+                }
+            }
+
+            for (let i = 0; i < ent.particles.length; i++) {
+                for (let j = i + 1; j < ent.particles.length; j++) {
+                    let dist = ent.particles[i].basePos.distanceTo(ent.particles[j].basePos);
+                    if (Math.abs(dist - L) < 0.1) {
+                        ent.springs.push({ p1: ent.particles[i], p2: ent.particles[j], restLength: dist });
+                    }
+                }
+            }
+        }
+
+        function rebuildUniverse() {
+            clearUniverse();
+
+            // Calculate dynamic offsets so they always touch, regardless of size
+            let widthA = (entA.gridSize * spacing) / 2;
+            let widthB = (entB.gridSize * spacing) / 2;
+            let gap = spacing * 0.8; 
+
+            entA.offset.x = -widthA - (gap / 2);
+            entB.offset.x = widthB + (gap / 2);
+
+            buildEntityGeometry(entA);
+            buildEntityGeometry(entB);
+
+            // Establish Bridge
+            for(let pA of entA.particles) {
+                for(let pB of entB.particles) {
+                    let dist = pA.basePos.distanceTo(pB.basePos);
+                    if(dist < spacing * 2.5) { 
+                        couplingSprings.push({ p1: pA, p2: pB, restLength: dist });
+                    }
+                }
+            }
+
+            // Visuals Generator
+            function createVisuals(ent, colorStr) {
+                let pPos = new Float32Array(ent.particles.length * 3);
+                let pGeom = new THREE.BufferGeometry();
+                pGeom.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+                universeGroup.add(new THREE.Points(pGeom, new THREE.PointsMaterial({ color: colorStr, size: 0.35 })));
+
+                let lPos = new Float32Array(ent.springs.length * 6);
+                let lGeom = new THREE.BufferGeometry();
+                lGeom.setAttribute('position', new THREE.BufferAttribute(lPos, 3));
+                universeGroup.add(new THREE.LineSegments(lGeom, new THREE.LineBasicMaterial({ color: colorStr, transparent: true, opacity: 0.25 })));
+                
+                return { p: pGeom, l: lGeom };
+            }
+
+            let visA = createVisuals(entA, entA.color);
+            geomA = visA.p; linesA = visA.l;
+            
+            let visB = createVisuals(entB, entB.color);
+            geomB = visB.p; linesB = visB.l;
+
+            let cPos = new Float32Array(couplingSprings.length * 6);
+            geomCouple = new THREE.BufferGeometry();
+            geomCouple.setAttribute('position', new THREE.BufferAttribute(cPos, 3));
+            universeGroup.add(new THREE.LineSegments(geomCouple, new THREE.LineBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.4 })));
+
+            // Update UI Mass
+            document.getElementById('out-mass-A').innerText = entA.particles.length;
+            document.getElementById('out-mass-B').innerText = entB.particles.length;
+        }
+
+        // --- 5. PHYSICS & TELEMETRY ---
+        function updateEntityPhysics(ent) {
+            ent.ke = 0;
+            ent.stress = 0;
+
+            for (let s of ent.springs) {
+                let dir = new THREE.Vector3().subVectors(s.p2.pos, s.p1.pos);
+                let currentLength = dir.length();
+                let disp = currentLength - s.restLength;
+                ent.stress += Math.abs(disp);
+                
+                dir.normalize().multiplyScalar(disp * ent.k);
+                s.p1.vel.add(dir.clone().multiplyScalar(1 / s.p1.mass));
+                s.p2.vel.sub(dir.clone().multiplyScalar(1 / s.p2.mass));
+            }
+
+            for (let p of ent.particles) {
+                p.vel.multiplyScalar(ent.damping); 
+                p.pos.add(p.vel);
+                p.vel.add(new THREE.Vector3().subVectors(p.basePos, p.pos).multiplyScalar(0.005)); 
+                ent.ke += 0.5 * p.mass * p.vel.lengthSq();
+            }
+
+            ent.baseFreq = 432 * Math.sqrt(ent.k / 0.1);
+            // Larger masses absorb stress better, so frequency shift is inversely proportional to mass
+            ent.currentFreq = ent.baseFreq + ((ent.stress * 2) / Math.max(1, ent.gridSize * 0.5));
+
+            if(audioEnabled) {
+                let targetVol = Math.min(ent.ke * 0.015, 0.8);
+                if (targetVol < 0.01) targetVol = 0.01;
+                ent.gainNode.gain.setTargetAtTime(targetVol, audioCtx.currentTime, 0.05);
+                
+                ent.oscBase.frequency.setTargetAtTime(ent.currentFreq, audioCtx.currentTime, 0.05);
+                ent.oscHarmonic.frequency.setTargetAtTime((ent.currentFreq * 1.5) + (ent.stress * 0.5), audioCtx.currentTime, 0.05);
+            }
+        }
+
+        function updatePhysics() {
+            updateEntityPhysics(entA);
+            updateEntityPhysics(entB);
+
+            for(let s of couplingSprings) {
+                let dir = new THREE.Vector3().subVectors(s.p2.pos, s.p1.pos);
+                let currentLength = dir.length();
+                let disp = currentLength - s.restLength;
+                
+                dir.normalize().multiplyScalar(disp * couplingStrength);
+                s.p1.vel.add(dir.clone().multiplyScalar(1 / s.p1.mass));
+                s.p2.vel.sub(dir.clone().multiplyScalar(1 / s.p2.mass));
+            }
+
+            document.getElementById('out-curr-A').innerText = entA.currentFreq.toFixed(1) + " Hz";
+            document.getElementById('out-ke-A').innerText = entA.ke.toFixed(2);
+            document.getElementById('out-stress-A').innerText = Math.max(0, 100 - (entA.stress * 1.5)).toFixed(1) + "%";
+
+            document.getElementById('out-curr-B').innerText = entB.currentFreq.toFixed(1) + " Hz";
+            document.getElementById('out-ke-B').innerText = entB.ke.toFixed(2);
+            document.getElementById('out-stress-B').innerText = Math.max(0, 100 - (entB.stress * 1.5)).toFixed(1) + "%";
+        }
+
+        // --- 6. RENDER LOOP ---
+        function updateVisuals(ent, geom, lines) {
+            let pPos = geom.attributes.position.array;
+            for (let i = 0; i < ent.particles.length; i++) {
+                pPos[i*3] = ent.particles[i].pos.x; pPos[i*3+1] = ent.particles[i].pos.y; pPos[i*3+2] = ent.particles[i].pos.z;
+            }
+            geom.attributes.position.needsUpdate = true;
+
+            let lPos = lines.attributes.position.array;
+            for (let i = 0; i < ent.springs.length; i++) {
+                let s = ent.springs[i];
+                lPos[i*6] = s.p1.pos.x; lPos[i*6+1] = s.p1.pos.y; lPos[i*6+2] = s.p1.pos.z;
+                lPos[i*6+3] = s.p2.pos.x; lPos[i*6+4] = s.p2.pos.y; lPos[i*6+5] = s.p2.pos.z;
+            }
+            lines.attributes.position.needsUpdate = true;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            updatePhysics();
+
+            updateVisuals(entA, geomA, linesA);
+            updateVisuals(entB, geomB, linesB);
+
+            let cPos = geomCouple.attributes.position.array;
+            for (let i = 0; i < couplingSprings.length; i++) {
+                let s = couplingSprings[i];
+                cPos[i*6] = s.p1.pos.x; cPos[i*6+1] = s.p1.pos.y; cPos[i*6+2] = s.p1.pos.z;
+                cPos[i*6+3] = s.p2.pos.x; cPos[i*6+4] = s.p2.pos.y; cPos[i*6+5] = s.p2.pos.z;
+            }
+            geomCouple.attributes.position.needsUpdate = true;
+
+            universeGroup.rotation.y = Math.sin(Date.now() * 0.0002) * 0.2;
+            universeGroup.rotation.x = Math.cos(Date.now() * 0.0003) * 0.1;
+
+            renderer.render(scene, camera);
+        }
+
+        // --- 7. INTERACTIONS ---
+        function triggerPulse(target) {
+            let ent = target === 'A' ? entA : entB;
+            for(let i=0; i<ent.particles.length; i++) {
+                let dist = ent.particles[i].pos.distanceTo(ent.offset);
+                if(dist < spacing * 2.5) {
+                    let blastDir = ent.particles[i].pos.clone().sub(ent.offset).normalize();
+                    // Larger masses need more force to trigger a visible pulse
+                    let force = (8 + Math.random() * 4) * (ent.gridSize / 4);
+                    ent.particles[i].vel.add(blastDir.multiplyScalar(force));
+                }
+            }
+        }
+
+        // Dynamic UI Binders
+        const bindSlider = (id, lblId, prefix, callback, isRebuild = false) => {
+            let el = document.getElementById(id);
+            el.addEventListener('input', (e) => {
+                let val = parseFloat(e.target.value);
+                document.getElementById(lblId).innerText = prefix + val;
+                if(!isRebuild) callback(val);
+            });
+            if(isRebuild) {
+                el.addEventListener('change', (e) => {
+                    callback(parseInt(e.target.value));
+                    rebuildUniverse();
+                });
+            }
+        };
+
+        bindSlider('size-A', 'lbl-size-A', 'Complexity (Size): ', (v) => entA.gridSize = v, true);
+        bindSlider('size-B', 'lbl-size-B', 'Complexity (Size): ', (v) => entB.gridSize = v, true);
+        bindSlider('tension-A', 'lbl-tension-A', 'Tension (k): ', (v) => entA.k = v);
+        bindSlider('tension-B', 'lbl-tension-B', 'Tension (k): ', (v) => entB.k = v);
+        bindSlider('damp-A', 'lbl-damp-A', 'Entropy: ', (v) => entA.damping = v);
+        bindSlider('damp-B', 'lbl-damp-B', 'Entropy: ', (v) => entB.damping = v);
+        bindSlider('coupling', 'lbl-couple', 'Coupling Strength: ', (v) => couplingStrength = v);
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        rebuildUniverse();
+        animate();
+    </script>
+</body>
+</html>
